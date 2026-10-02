@@ -1,0 +1,10 @@
+{
+  "datasets": [
+    {
+      "name": "example",
+      "fused_dir": "../outputs/evaluation/fused_stage3_ep027/example",
+      "ir_dir": "../datasets/example/ir",
+      "vis_dir": "../datasets/example/vis"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "datasets": [
+    {
+      "name": "example",
+      "root": "../datasets/example",
+      "ir_dir": "ir",
+      "vis_dir": "vis",
+      "has_gt": false
+    }
+  ]
+}
