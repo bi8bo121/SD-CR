@@ -2,88 +2,190 @@
 
 **Structure–Degradation Co-Reasoning for Infrared–Visible Image Fusion under Asymmetric Degradation**
 
-本项目包含三阶段训练代码，以及用于图像融合推理和评估的 `test.py`。Stage 1 训练可见光恢复网络；Stage 2 在 Stage 1 权重基础上训练融合分支；Stage 3 从 Stage 2 权重继续微调。模型结构、损失和训练数值参数沿用原实现。
+Official implementation of **SD-CR** for infrared–visible image fusion under asymmetric degradation.
 
-## 代码结构
+This repository provides a three-stage training pipeline and inference and evaluation code:
 
-```text
-├── stage1.py           # Stage 1：恢复网络训练
-├── stage2.py           # Stage 2：融合网络训练
-├── stage3.py           # Stage 3：分阶段微调
-├── test.py             # Stage 3 推理及融合指标评估
-├── models/             # 模型及其依赖模块
-├── data/               # 数据读取与训练增强代码
-├── losses/             # Stage 1 损失
-├── trainers/           # Stage 2/3 融合损失
-├── utils/              # Stage 2/3 训练验证指标
-├── configs/            # 数据集清单示例
-├── requirements.txt
-└── .gitignore
-```
+- **Stage 1 — Visible image restoration:** train the visible image restoration network.
+- **Stage 2 — Image fusion:** initialize from the Stage 1 checkpoint and train the fusion branch.
+- **Stage 3 — Fine-tuning:** continue from the Stage 2 checkpoint using a staged freezing and fine-tuning schedule.
 
-以下命令均从项目根目录执行。
+The `test.py` script generates fused images and computes evaluation metrics using a Stage 3 checkpoint.
 
-## 环境安装
+[Installation](#installation) · [Data Preparation](#data-preparation) · [Checkpoints](#checkpoints) · [Training](#training) · [Inference and Evaluation](#inference-and-evaluation)
 
-代码需要 Python 3.9 或更新版本。建议先建立独立环境，并安装与本机 CPU/CUDA 平台匹配的 PyTorch 和 torchvision：
+## Repository Structure
+
+| File or directory | Description |
+| --- | --- |
+| `stage1.py` | Stage 1: visible image restoration training |
+| `stage2.py` | Stage 2: fusion training |
+| `stage3.py` | Stage 3: staged fine-tuning |
+| `test.py` | Inference and fusion metric evaluation using a Stage 3 checkpoint |
+| `models/` | Model architectures and supporting modules |
+| `data/` | Dataset loading and training augmentations |
+| `losses/` | Stage 1 loss functions |
+| `trainers/` | Stage 2 and Stage 3 fusion loss functions |
+| `utils/` | Training and validation metrics for Stages 2 and 3 |
+| `configs/` | Example dataset configuration files |
+| `requirements.txt` | Python dependencies |
+| `.gitignore` | Git ignore rules |
+
+Run all commands below from the project root directory.
+
+## Installation
+
+Python **3.9 or later** is required. Create a dedicated environment:
 
 ```bash
 python -m venv .venv
+```
+
+Activate the environment on Linux or macOS:
+
+```bash
 source .venv/bin/activate
+```
+
+On Windows PowerShell, use:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install PyTorch and torchvision for your CPU or CUDA platform, then install the project dependencies:
+
+```bash
 python -m pip install -r requirements.txt
 ```
 
-`requirements.txt` 按代码导入列出依赖包，没有指定未经确认的精确版本。Stage 1 使用 `piq.brisque`，因此需要 `piq`。`test.py` 的 CPBD 指标依赖可选包 `cpbd`；传入 `--use_pyiqa` 时，MUSIQ/BRISQUE 指标还需要 `pyiqa`；Excel 输出需要 `openpyxl`。缺少这些可选包时，相关指标可能记为 NaN，或只生成 CSV。
+The dependency list is based on the packages imported by the code. Exact dependency versions have not been pinned to a verified environment.
 
-## 数据准备
+| Package | Purpose |
+| --- | --- |
+| `piq` | Required by Stage 1 for `piq.brisque` |
+| `cpbd` | Optional CPBD evaluation in `test.py` |
+| `pyiqa` | Optional MUSIQ and BRISQUE evaluation when `--use_pyiqa` is enabled |
+| `openpyxl` | Optional Excel export |
 
-`data/dataset_v2.py` 读取**预先准备好的退化图像**，项目内没有完整的退化生成流水线。训练数据包含五类退化：`VI_Blur`、`VI_Haze`、`VI_Low_light`、`VI_Noise`、`VI_Over_exposure`；每类使用 `slight`、`moderate`、`average`、`extreme` 四种强度。目录示例：
+Install the optional evaluation and export packages as needed:
 
-```text
-datasets/DDL/
-└── VI_Blur/
-    └── VI_Blur_slight/
-        ├── train/
-        │   ├── Infrared/    # 灰度红外图
-        │   ├── Visible/     # 退化 RGB 可见光图
-        │   └── Visible_gt/  # 干净 RGB 可见光图
-        └── test/
-            ├── Infrared/
-            └── Visible/
+```bash
+python -m pip install cpbd pyiqa openpyxl
 ```
 
-其他退化类型和强度采用相同结构。同一组的 IR、VIS、GT 图像需使用相同文件主名。代码也接受 `VI_Blur/slight/{train,test}/...` 这种目录形式。训练时图像缩放到 320×320，并随机裁成 256×256；训练过程中的验证数据来自 `test/`，该划分没有 `Visible_gt`。
+If an optional metric dependency is unavailable, the corresponding metric may be recorded as `NaN`. Without Excel support, evaluation results may be exported only as CSV files.
 
-## 权重准备
+The multiline commands below use Bash line continuation (`\`). On Windows, run them in a Bash-compatible terminal or combine each command into a single line.
 
-本仓库不包含数据集或模型权重。默认路径及用途如下，也可以在命令中传入实际存放路径：
+## Data Preparation
 
-| 文件 | 默认相对路径 | 用途 |
+The loader in `data/dataset_v2.py` reads **pre-generated degraded images**. A complete degradation generation pipeline is not included in this repository.
+
+Training uses the following visible-image degradation types:
+
+| Directory name | Degradation |
+| --- | --- |
+| `VI_Blur` | Blur |
+| `VI_Haze` | Haze |
+| `VI_Low_light` | Low light |
+| `VI_Noise` | Noise |
+| `VI_Over_exposure` | Overexposure |
+
+Each degradation type uses four intensity directory names: `slight`, `moderate`, `average`, and `extreme`. Keep these names exactly as shown for compatibility with the loader.
+
+For example, organize the slight blur subset under `datasets/DDL/VI_Blur/VI_Blur_slight/`:
+
+| Subdirectory | Contents |
+| --- | --- |
+| `train/Infrared/` | Grayscale infrared images |
+| `train/Visible/` | Degraded RGB visible images |
+| `train/Visible_gt/` | Clean RGB visible reference images |
+| `test/Infrared/` | Infrared images used for validation during training |
+| `test/Visible/` | Degraded visible images used for validation during training |
+
+Use the same structure for the remaining degradation types and intensities. The alternative layout `VI_Blur/slight/{train,test}/...` is also supported.
+
+- Paired infrared, visible, and clean visible images must have matching filename stems.
+- During training, images are resized to **320 × 320** and randomly cropped to **256 × 256**.
+- Validation during training reads from `test/`; this split does not contain `Visible_gt/`.
+- Datasets and paired example images are not bundled with the repository.
+
+## Checkpoints
+
+The shared **`ckpt`** folder can be accessed through Baidu Netdisk:
+
+**[Download from Baidu Netdisk](https://pan.baidu.com/s/1peWQgwwDZ91zKZOTU_ZCaw?pwd=1jpv)**  
+**Extraction code:** `1jpv`
+
+Checkpoints are distributed separately from the source repository. The commands in this README use the following checkpoint filenames and locations. Place the required files at these paths, or pass their actual locations using the corresponding command-line arguments.
+
+| Checkpoint | Path used in the examples | Purpose |
 | --- | --- | --- |
-| Stage 1 epoch 150 | `checkpoints_l1_balanced_5types/restoration_epoch_150.pt` | 初始化 Stage 2 和 Stage 3 |
-| Stage 2 epoch 120 完整断点 | `stage2_results_fresh/stage2_ep120_full.pth` | 初始化 Stage 3 |
-| Stage 3 epoch 27 | `stage3_results/stage3_ep027.pth` | `test.py` 推理与评估 |
+| Stage 1, epoch 150 | `checkpoints_l1_balanced_5types/restoration_epoch_150.pt` | Restoration initialization for Stages 2 and 3 |
+| Stage 2, epoch 120, full checkpoint | `stage2_results_fresh/stage2_ep120_full.pth` | Initialization for Stage 3 |
+| Stage 3, epoch 27 | `stage3_results/stage3_ep027.pth` | Inference and evaluation with `test.py` |
 
-完整的 Stage 3 权重可以单独供 `test.py` 推理，不需要另外传 Stage 1 权重。没有可核实的公开权重下载地址，因此此处不提供下载链接。
+**For inference only, a complete Stage 3 checkpoint is sufficient.** You do not need to provide a separate Stage 1 checkpoint to `test.py`.
 
-## 三阶段训练
+## Training
+
+### Stage 1: Visible Image Restoration
 
 ```bash
 python stage1.py --data-root datasets/DDL
+```
 
+By default, Stage 1 trains for **150 epochs** and saves model weights every **5 epochs**.
+
+- Checkpoint directory: `checkpoints_l1_balanced_5types/`
+- Validation image directory: `val_results_l1_balanced_5types/`
+
+### Stage 2: Image Fusion
+
+Initialize from the Stage 1 restoration checkpoint:
+
+```bash
 python stage2.py --data-root datasets/DDL \
   --stage1-ckpt checkpoints_l1_balanced_5types/restoration_epoch_150.pt
+```
 
+Stage 2 trains for **150 epochs** by default. Model weights and full training checkpoints are saved to `stage2_results_fresh/`.
+
+### Stage 3: Fine-tuning
+
+Provide the Stage 1 checkpoint and the Stage 2 full checkpoint:
+
+```bash
 python stage3.py --data-root datasets/DDL \
   --stage1-ckpt checkpoints_l1_balanced_5types/restoration_epoch_150.pt \
   --stage2-ckpt stage2_results_fresh/stage2_ep120_full.pth
 ```
 
-Stage 1 默认训练 150 epoch，每 5 轮将权重保存至 `checkpoints_l1_balanced_5types/`，验证图保存至 `val_results_l1_balanced_5types/`。Stage 2 默认训练 150 epoch，权重及完整断点保存至 `stage2_results_fresh/`。Stage 3 默认训练 30 epoch，前 8 轮执行第一阶段冻结策略，之后继续微调；结果保存至 `stage3_results/`。Stage 1/2 如需从完整断点续训，显式传入 `--resume <断点路径>`。三个脚本均可用 `--device cpu` 或 `--device cuda:0` 指定设备。
+Stage 3 trains for **30 epochs** by default. The initial freezing schedule is applied for the first **8 epochs**, followed by further fine-tuning. Outputs are saved to `stage3_results/`.
 
-## 推理和评估
+The Stage 3 command above initializes from **Stage 2 epoch 120**, while Stage 2's default training duration is 150 epochs. These are separate settings; retain the specified initialization checkpoint when following this configuration.
 
-`test.py` 按同名文件配对红外与可见光图，生成融合图并统计指标。单数据集示例：
+### Device Selection and Resuming Training
+
+All three training scripts accept `--device cpu` or `--device cuda:0`.
+
+To resume **Stage 1 or Stage 2** from a full training checkpoint, explicitly add `--resume <checkpoint_path>` to the relevant command.
+
+## Inference and Evaluation
+
+### Single Dataset
+
+Prepare your own paired infrared and visible images under a dataset root, for example:
+
+| Directory | Contents |
+| --- | --- |
+| `datasets/example/ir/` | Infrared input images |
+| `datasets/example/vis/` | Visible input images with matching filenames |
+
+The `datasets/example/` directory is an illustration and is not included in this repository.
+
+Run inference and evaluation:
 
 ```bash
 python test.py \
@@ -94,13 +196,53 @@ python test.py \
   --results_root outputs/evaluation
 ```
 
-这里 `datasets/example` 是用户自行准备的数据目录，包含 `ir/` 和 `vis/` 两个子目录，本仓库没有附带样例图像。融合图写入 `outputs/evaluation/fused_stage3_ep027/example/`；逐图和汇总结果分别写入 `all_details.csv`、`all_summary.csv`，运行配置写入 `run_config.json`。无干净可见光 GT 时，脚本计算 EN、SD、SF、AG，以及可用时的 CPBD、MUSIQ、BRISQUE。
+The script pairs infrared and visible images by filename and saves fused images to:
 
-如数据还包含干净可见光图像，可加 `--gt_dir Visible_gt`，脚本会按三路同名文件配对并计算更多指标。多个数据集可改用 `--dataset_config configs/inference_datasets.example.json`；运行前请将示例配置中的路径改成实际位置。`--dataset_root` 和 `--dataset_config` 必须二选一。脚本只保存融合图；如果需要其他输出，请查看模型前向返回的 `restored_image`。
+```text
+outputs/evaluation/fused_stage3_ep027/example/
+```
 
-## 已知限制
+It also writes the following evaluation files:
 
-- 仓库不包含数据集、权重、退化生成代码或可确认适合公开分发的成对图像样例。
-- Stage 1 的恢复输出将解码结果与退化 VIS 相加；Stage 2/3 的 `restored_image` 直接取解码结果。此差异来自现有实现。
-- 原工作区未发现主项目许可证文件，因此这里未添加许可证。
-- 本次整理验证了代码导入、权重加载和单张真实图像的推理；未运行长时间训练或完整数据集复算。
+| File | Contents |
+| --- | --- |
+| `all_details.csv` | Per-image metric results |
+| `all_summary.csv` | Summary metric results |
+| `run_config.json` | Configuration used for the evaluation run |
+
+Without clean visible reference images, the script computes **EN, SD, SF, and AG**, along with optional quality metrics:
+
+- **CPBD**, when its dependency is available.
+- **MUSIQ and BRISQUE**, when `pyiqa` is installed and `--use_pyiqa` is supplied.
+
+### Evaluation with Clean Visible References
+
+If the dataset also contains clean visible images in `Visible_gt/`, add the following argument to the single-dataset command:
+
+```bash
+--gt_dir Visible_gt
+```
+
+The script then matches infrared, visible, and clean visible images by filename and computes additional metrics.
+
+### Multiple Datasets
+
+Edit `configs/inference_datasets.example.json` to point to your actual dataset locations, then run:
+
+```bash
+python test.py \
+  --stage3_ckpt stage3_results/stage3_ep027.pth \
+  --dataset_config configs/inference_datasets.example.json \
+  --results_root outputs/evaluation
+```
+
+Use **exactly one** of `--dataset_root` and `--dataset_config`.
+
+The evaluation script saves fused images only. The model's forward output also includes `restored_image`; saving restoration outputs requires adapting the inference code.
+
+## Implementation Notes
+
+- **Restoration output:** Stage 1 adds the decoder output to the degraded visible input. In Stages 2 and 3, `restored_image` is taken directly from the decoder output. This difference is part of the current implementation.
+- **Dependencies:** Exact dependency versions are not pinned to a verified environment; use a compatible PyTorch and torchvision installation for your platform.
+- **Release validation:** The validation reported during code preparation covered imports, checkpoint loading, and inference on one real image. Long-duration training and full-dataset evaluation were not rerun as part of that preparation.
+- **License:** No project-level license file is currently included in this release.
