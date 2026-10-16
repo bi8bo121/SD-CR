@@ -148,4 +148,4 @@ If you find this work useful, please consider citing:
 
 ## 🤝 Contact
 
-[wangxiaosa@stu.kust.edu.cn](mailto:wangxiaosa@stu.kust.edu.cn)
+If you have any questions or suggestions about our work, please feel free to contact us at [wangxiaosa@stu.kust.edu.cn](mailto:wangxiaosa@stu.kust.edu.cn).
