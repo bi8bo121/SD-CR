@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="132" height="28" viewBox="0 0 132 28" role="img" aria-labelledby="title">
+  <title id="title">GitHub: Code</title>
+  <rect width="76" height="28" fill="#555"/>
+  <rect x="76" width="56" height="28" fill="#2563eb"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="10" font-weight="bold" letter-spacing="1">
+    <text x="38" y="18">GITHUB</text>
+    <text x="104" y="18">CODE</text>
+  </g>
+</svg>
