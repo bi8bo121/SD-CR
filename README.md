@@ -56,13 +56,7 @@ conda activate sdcr
 python -m pip install -r requirements.txt
 ```
 
-Use a PyTorch/torchvision installation compatible with your CPU or CUDA platform. See [setup notes](docs/USAGE.md#installation) for optional evaluation packages.
-
-<a id="data-preparation"></a>
-
-## 📂 Data Preparation
-
-See [data preparation](docs/USAGE.md#data-preparation) for the training directory structure and supported degradation settings.
+Use a PyTorch/torchvision installation compatible with your CPU or CUDA platform.
 
 <a id="checkpoints"></a>
 
@@ -70,7 +64,7 @@ See [data preparation](docs/USAGE.md#data-preparation) for the training director
 
 Download from **[Baidu Netdisk](https://pan.baidu.com/s/1peWQgwwDZ91zKZOTU_ZCaw?pwd=1jpv)**. Extraction code: **`1jpv`**.
 
-For inference, place the Stage 3 checkpoint at `stage3_results/stage3_ep027.pth`. See [checkpoint paths](docs/USAGE.md#checkpoints) for all three training stages.
+For inference, place the Stage 3 checkpoint at `stage3_results/stage3_ep027.pth`.
 
 <a id="inference-and-evaluation"></a>
 
@@ -86,8 +80,6 @@ python test.py \
   --dataset_name example \
   --results_root outputs/evaluation
 ```
-
-See [evaluation options](docs/USAGE.md#inference-and-evaluation) for reference images, multiple datasets, and output files.
 
 <a id="training"></a>
 
@@ -106,8 +98,6 @@ python stage3.py --data-root datasets/DDL \
   --stage1-ckpt checkpoints_l1_balanced_5types/restoration_epoch_150.pt \
   --stage2-ckpt stage2_results_fresh/stage2_ep120_full.pth
 ```
-
-See [training details](docs/USAGE.md#training) and [implementation notes](docs/USAGE.md#implementation-notes) for schedules, resuming, and reproduction details.
 
 <a id="results"></a>
 
@@ -158,6 +148,4 @@ If you find this work useful, please consider citing:
 
 ## 🤝 Contact
 
-Please [open an issue](https://github.com/bi8bo121/SD-CR/issues) or contact [Xiaosa Wang](mailto:wangxiaosa@stu.kust.edu.cn).
-
-Corresponding authors: [Huafeng Li](mailto:lhfchina99@kust.edu.cn) and [Wen Wang](mailto:sophia_84@126.com).
+[wangxiaosa@stu.kust.edu.cn](mailto:wangxiaosa@stu.kust.edu.cn)
